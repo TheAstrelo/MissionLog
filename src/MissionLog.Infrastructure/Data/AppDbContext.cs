@@ -74,12 +74,5 @@ public class AppDbContext : DbContext
              .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Seed roles / demo users
-        modelBuilder.Entity<User>().HasData(
-            new User { Id = 1, Username = "admin", Email = "admin@missionlog.dev", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"), Role = "Admin", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new User { Id = 2, Username = "supervisor", Email = "supervisor@missionlog.dev", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Super123!"), Role = "Supervisor", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new User { Id = 3, Username = "engineer", Email = "engineer@missionlog.dev", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Eng123!"), Role = "Engineer", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new User { Id = 4, Username = "technician", Email = "tech@missionlog.dev", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech123!"), Role = "Technician", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
-        );
     }
 }

@@ -77,11 +77,12 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Auto-migrate on startup
+// Auto-migrate and seed on startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    await DatabaseSeeder.SeedAsync(db);
 }
 
 if (app.Environment.IsDevelopment())
