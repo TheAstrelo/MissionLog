@@ -1,0 +1,48 @@
+## .NET
+*.user
+*.suo
+.vs/
+bin/
+obj/
+*.userprefs
+.idea/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!**/[Pp]ackages/repositories.config
+*.nuspec
+
+## Secrets
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+.env
+.env.*
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Test results
+TestResults/
+coverage/
+*.trx
+*.coveragexml

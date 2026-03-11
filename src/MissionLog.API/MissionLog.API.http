@@ -1,0 +1,6 @@
+@MissionLog.API_HostAddress = http://localhost:5227
+
+GET {{MissionLog.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
