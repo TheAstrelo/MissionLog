@@ -1,0 +1,38 @@
+<!--
+  Central Package Management — all NuGet versions defined here.
+  Individual csproj files must NOT specify Version= attributes.
+  Add new packages here first, then reference them in csproj files.
+  Docs: https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management
+-->
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <!--
+    NOTE: CPM is currently disabled (ManagePackageVersionsCentrally=false).
+    This file documents the intended pinned versions for reference.
+    To enable CPM, set ManagePackageVersionsCentrally=true and remove
+    Version= from all PackageReference entries in .csproj files.
+
+    Current pinned versions:
+      Azure.Core                                    1.44.1   (net6.0+ — fixes net5.0 transitive conflict)
+      BCrypt.Net-Next                               4.0.3
+      FluentAssertions                              6.12.2
+      Microsoft.AspNetCore.Authentication.JwtBearer 8.0.11
+      Microsoft.AspNetCore.Components.WebAssembly   8.0.11
+      Microsoft.AspNetCore.SignalR.Client           8.0.11
+      Microsoft.EntityFrameworkCore                 8.0.11
+      Microsoft.EntityFrameworkCore.Design          8.0.11
+      Microsoft.EntityFrameworkCore.InMemory        8.0.11
+      Microsoft.EntityFrameworkCore.SqlServer       8.0.11
+      Microsoft.EntityFrameworkCore.Tools           8.0.11
+      Microsoft.Extensions.Http                     8.0.1
+      Microsoft.NET.Test.Sdk                        17.12.0
+      Moq                                           4.20.72
+      Swashbuckle.AspNetCore                        6.9.0
+      System.IdentityModel.Tokens.Jwt               8.3.2
+      xunit                                         2.9.2
+      xunit.runner.visualstudio                     2.8.2
+  -->
+</Project>
