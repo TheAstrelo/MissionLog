@@ -24,6 +24,14 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    # Pin the SDK to 8.x so the .NET 10 pre-installed SDK doesn't take over
+    - name: Pin SDK version
+      run: |
+        echo '{ "sdk": { "version": "8.0.0", "rollForward": "latestMinor" } }' > global.json
+
+    - name: Install Blazor WASM workload
+      run: dotnet workload install wasm-tools
+
     - name: Restore dependencies
       run: dotnet restore MissionLog.sln
 
@@ -35,9 +43,6 @@ jobs:
 
     - name: Publish API
       run: dotnet publish src/MissionLog.API/MissionLog.API.csproj -c Release --no-restore -o ./publish/api
-
-    - name: Install Blazor WASM workload
-      run: dotnet workload install wasm-tools
 
     - name: Publish Blazor
       run: dotnet publish src/MissionLog.BlazorApp/MissionLog.BlazorApp.csproj -c Release --no-restore -o ./publish/blazor
