@@ -6,12 +6,18 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
     - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
@@ -21,14 +27,31 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore MissionLog.sln
 
-    - name: Build
+    - name: Build solution
       run: dotnet build MissionLog.sln --no-restore --configuration Release
 
-    - name: Run Tests
+    - name: Run tests
       run: dotnet test tests/MissionLog.Tests --no-build --configuration Release --verbosity normal
 
     - name: Publish API
-      run: dotnet publish src/MissionLog.API/MissionLog.API.csproj -c Release -o ./publish/api
+      run: dotnet publish src/MissionLog.API/MissionLog.API.csproj -c Release --no-restore -o ./publish/api
+
+    - name: Install Blazor WASM workload
+      run: dotnet workload install wasm-tools
 
     - name: Publish Blazor
-      run: dotnet publish src/MissionLog.BlazorApp/MissionLog.BlazorApp.csproj -c Release -o ./publish/blazor
+      run: dotnet publish src/MissionLog.BlazorApp/MissionLog.BlazorApp.csproj -c Release --no-restore -o ./publish/blazor
+
+    - name: Upload API artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: api-publish
+        path: ./publish/api
+        retention-days: 7
+
+    - name: Upload Blazor artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: blazor-publish
+        path: ./publish/blazor/wwwroot
+        retention-days: 7
