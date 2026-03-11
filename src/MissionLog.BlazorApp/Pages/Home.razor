@@ -1,7 +1,128 @@
-﻿@page "/"
+@page "/"
+@inject ApiService Api
+@inject NavigationManager Nav
 
-<PageTitle>Home</PageTitle>
+<PageTitle>MissionLog — Dashboard</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="ml-page-header">
+    <div class="ml-breadcrumb">// OPERATIONS / DASHBOARD</div>
+    <div class="ml-page-title">Mission Control</div>
+    <div class="ml-page-sub">Real-time system overview — all active work orders and status</div>
+</div>
 
-Welcome to your new app.
+@if (_loading)
+{
+    <div class="ml-loading"><div class="ml-spinner"></div> LOADING TELEMETRY...</div>
+}
+else if (_summary != null)
+{
+    <div class="ml-stat-grid">
+        <div class="ml-stat-card cyan">
+            <div class="ml-stat-label">Total Orders</div>
+            <div class="ml-stat-value">@_summary.Total</div>
+            <div class="ml-stat-delta">ALL SYSTEMS</div>
+        </div>
+        <div class="ml-stat-card blue">
+            <div class="ml-stat-label">Draft</div>
+            <div class="ml-stat-value">@_summary.Draft</div>
+            <div class="ml-stat-delta">PENDING SUBMIT</div>
+        </div>
+        <div class="ml-stat-card purple">
+            <div class="ml-stat-label">Under Review</div>
+            <div class="ml-stat-value">@_summary.UnderReview</div>
+            <div class="ml-stat-delta">AWAITING APPROVAL</div>
+        </div>
+        <div class="ml-stat-card green">
+            <div class="ml-stat-label">Approved</div>
+            <div class="ml-stat-value">@_summary.Approved</div>
+            <div class="ml-stat-delta">CLEARED TO PROCEED</div>
+        </div>
+        <div class="ml-stat-card amber">
+            <div class="ml-stat-label">In Progress</div>
+            <div class="ml-stat-value">@_summary.InProgress</div>
+            <div class="ml-stat-delta">ACTIVE WORK</div>
+        </div>
+        <div class="ml-stat-card red">
+            <div class="ml-stat-label">Rejected</div>
+            <div class="ml-stat-value">@_summary.Rejected</div>
+            <div class="ml-stat-delta">REQUIRES REVISION</div>
+        </div>
+    </div>
+
+    <div class="ml-card">
+        <div class="ml-card-header">
+            <div class="ml-card-title">Recent Work Orders</div>
+            <button class="ml-btn ml-btn-ghost ml-btn-sm" @onclick='() => Nav.NavigateTo("/workorders")'>
+                VIEW ALL →
+            </button>
+        </div>
+        @if (_recent != null && _recent.Any())
+        {
+            <div class="ml-table-wrap">
+                <table class="ml-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>System</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created By</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var wo in _recent.Take(8))
+                        {
+                            <tr @onclick='() => Nav.NavigateTo($"/workorders/{wo.Id}")'>
+                                <td><span class="ml-mono ml-text-muted">WO-@wo.Id.ToString("D4")</span></td>
+                                <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@wo.Title</td>
+                                <td><span class="ml-text-dim">@wo.System</span></td>
+                                <td><span class="ml-priority-@wo.Priority.ToString().ToLower()">@wo.Priority</span></td>
+                                <td>@StatusBadge(wo.Status)</td>
+                                <td><span class="ml-text-dim">@wo.CreatedBy</span></td>
+                                <td><span class="ml-mono ml-text-muted" style="font-size:11px">@wo.CreatedAt.ToString("MM/dd HH:mm")</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="ml-empty">
+                <div class="ml-empty-icon">📋</div>
+                <div class="ml-empty-text">NO WORK ORDERS YET — CREATE ONE TO BEGIN</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    WorkOrderSummaryDto? _summary;
+    List<WorkOrderDto>? _recent;
+    bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _summary = await Api.GetSummaryAsync();
+            _recent = await Api.GetWorkOrdersAsync();
+        }
+        catch { }
+        finally { _loading = false; }
+    }
+
+    RenderFragment StatusBadge(WorkOrderStatus s) => s switch
+    {
+        WorkOrderStatus.Draft       => @<span class="ml-badge ml-badge-draft">Draft</span>,
+        WorkOrderStatus.Submitted   => @<span class="ml-badge ml-badge-submitted">Submitted</span>,
+        WorkOrderStatus.UnderReview => @<span class="ml-badge ml-badge-review">Review</span>,
+        WorkOrderStatus.Approved    => @<span class="ml-badge ml-badge-approved">Approved</span>,
+        WorkOrderStatus.InProgress  => @<span class="ml-badge ml-badge-progress">In Progress</span>,
+        WorkOrderStatus.Completed   => @<span class="ml-badge ml-badge-completed">Completed</span>,
+        WorkOrderStatus.Rejected    => @<span class="ml-badge ml-badge-rejected">Rejected</span>,
+        _ => @<span class="ml-badge ml-badge-draft">@s</span>
+    };
+}

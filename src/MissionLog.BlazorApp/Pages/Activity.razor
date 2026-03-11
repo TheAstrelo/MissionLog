@@ -1,0 +1,163 @@
+@page "/activity"
+@implements IAsyncDisposable
+@inject AuthStateService Auth
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.SignalR.Client
+
+<PageTitle>MissionLog — Live Activity</PageTitle>
+
+<div class="ml-page-header" style="display:flex;align-items:flex-start;justify-content:space-between">
+    <div>
+        <div class="ml-breadcrumb">// OPERATIONS / LIVE ACTIVITY</div>
+        <div class="ml-page-title">Live Activity Feed</div>
+        <div class="ml-page-sub">Real-time work order events via SignalR</div>
+    </div>
+    <div>
+        @if (_connected)
+        {
+            <span class="ml-live-dot">LIVE</span>
+        }
+        else
+        {
+            <span class="ml-mono ml-text-muted" style="font-size:10px;letter-spacing:0.1em">CONNECTING...</span>
+        }
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
+    <!-- Feed -->
+    <div class="ml-card" style="padding:0">
+        <div class="ml-card-header" style="padding:16px 20px;border-bottom:1px solid var(--ml-border)">
+            <div class="ml-card-title">EVENT STREAM</div>
+            <button class="ml-btn ml-btn-ghost ml-btn-sm" @onclick="ClearFeed">CLEAR</button>
+        </div>
+        @if (!_events.Any())
+        {
+            <div class="ml-empty">
+                <div class="ml-empty-icon">📡</div>
+                <div class="ml-empty-text">AWAITING EVENTS — PERFORM WORK ORDER ACTIONS TO SEE LIVE UPDATES</div>
+            </div>
+        }
+        else
+        {
+            <div class="ml-timeline" style="padding:8px 20px">
+                @foreach (var evt in _events)
+                {
+                    <div class="ml-timeline-item">
+                        <div class="ml-timeline-dot @evt.DotClass">@evt.Icon</div>
+                        <div class="ml-timeline-content">
+                            <div class="ml-timeline-title">@evt.Title</div>
+                            <div style="font-size:12px;color:var(--ml-text-dim);margin:2px 0">@evt.Detail</div>
+                            <div class="ml-timeline-meta">@evt.Time.ToString("HH:mm:ss UTC")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Stats sidebar -->
+    <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="ml-card">
+            <div class="ml-card-title" style="margin-bottom:14px">SESSION STATS</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="ml-text-muted" style="font-size:12px">Events Received</span>
+                    <span class="ml-mono ml-text-cyan">@_events.Count</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="ml-text-muted" style="font-size:12px">Created</span>
+                    <span class="ml-mono ml-text-blue">@_events.Count(e => e.Type == "created")</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="ml-text-muted" style="font-size:12px">Approved</span>
+                    <span class="ml-mono ml-text-green">@_events.Count(e => e.Type == "approved")</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="ml-text-muted" style="font-size:12px">Rejected</span>
+                    <span class="ml-mono ml-text-red">@_events.Count(e => e.Type == "rejected")</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="ml-text-muted" style="font-size:12px">Updated</span>
+                    <span class="ml-mono ml-text-amber">@_events.Count(e => e.Type == "updated")</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="ml-card">
+            <div class="ml-card-title" style="margin-bottom:12px">CONNECTION</div>
+            <div style="font-family:var(--ml-mono);font-size:11px;color:var(--ml-text-muted);line-height:1.8">
+                STATUS: <span class="@(_connected ? "ml-text-green" : "ml-text-amber")">
+                    @(_connected ? "CONNECTED" : "RECONNECTING")
+                </span><br />
+                HUB: /hubs/workorders<br />
+                TRANSPORT: WebSocket<br />
+                USER: @Auth.CurrentUser?.Username?.ToUpper()
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    record FeedEvent(string Type, string Icon, string DotClass, string Title, string Detail, DateTime Time);
+
+    HubConnection? _hub;
+    List<FeedEvent> _events = new();
+    bool _connected;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.CurrentUser == null) return;
+
+        var hubUrl = "https://localhost:7100/hubs/workorders";
+        _hub = new HubConnectionBuilder()
+            .WithUrl($"{hubUrl}?access_token={Auth.Token}")
+            .WithAutomaticReconnect()
+            .Build();
+
+        _hub.On<WorkOrderDto>("WorkOrderCreated", wo =>
+        {
+            AddEvent("created", "→", "created", $"WO-{wo.Id:D4} Created", $"{wo.Title} — by {wo.CreatedBy}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hub.On<WorkOrderDto>("WorkOrderUpdated", wo =>
+        {
+            AddEvent("updated", "●", "updated", $"WO-{wo.Id:D4} Updated", $"{wo.Title}");
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hub.On<object>("WorkOrderStatusChanged", payload =>
+        {
+            AddEvent("updated", "◈", "updated", "Status Changed", payload?.ToString() ?? "");
+            InvokeAsync(StateHasChanged);
+        });
+
+        _hub.Reconnecting += _ => { _connected = false; InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+        _hub.Reconnected  += _ => { _connected = true;  InvokeAsync(StateHasChanged); return Task.CompletedTask; };
+
+        try
+        {
+            await _hub.StartAsync();
+            _connected = true;
+        }
+        catch
+        {
+            AddEvent("updated", "⚠", "rejected", "Connection Failed",
+                "Could not connect to SignalR hub. Is the API running on localhost:7100?");
+        }
+    }
+
+    void AddEvent(string type, string icon, string dotClass, string title, string detail)
+    {
+        _events.Insert(0, new FeedEvent(type, icon, dotClass, title, detail, DateTime.UtcNow));
+        if (_events.Count > 100) _events.RemoveAt(_events.Count - 1);
+    }
+
+    void ClearFeed() => _events.Clear();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hub != null) await _hub.DisposeAsync();
+    }
+}

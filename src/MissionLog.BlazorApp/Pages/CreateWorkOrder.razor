@@ -1,0 +1,135 @@
+@page "/workorders/new"
+@inject ApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>MissionLog — New Work Order</PageTitle>
+
+<div class="ml-page-header">
+    <div class="ml-breadcrumb">// OPERATIONS / WORK ORDERS / NEW</div>
+    <div class="ml-page-title">Create Work Order</div>
+    <div class="ml-page-sub">Submit a new maintenance or engineering task for approval</div>
+</div>
+
+<div style="max-width:620px">
+    <div class="ml-card">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="ml-alert ml-alert-error">⚠ @_error</div>
+        }
+        @if (!string.IsNullOrEmpty(_success))
+        {
+            <div class="ml-alert ml-alert-success">✓ @_success</div>
+        }
+
+        <div class="ml-form-group">
+            <label class="ml-label">Work Order Title *</label>
+            <input class="ml-input" @bind="_title" placeholder="e.g. Replace hydraulic actuator on Bay 4" />
+        </div>
+
+        <div class="ml-form-group">
+            <label class="ml-label">System / Subsystem *</label>
+            <select class="ml-input ml-select" @bind="_system">
+                <option value="">— Select System —</option>
+                <option>Avionics</option>
+                <option>Propulsion</option>
+                <option>Hydraulics</option>
+                <option>Life Support</option>
+                <option>Navigation</option>
+                <option>Communications</option>
+                <option>Structural</option>
+                <option>Power Systems</option>
+                <option>Thermal Control</option>
+                <option>Other</option>
+            </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="ml-form-group">
+                <label class="ml-label">Priority *</label>
+                <select class="ml-input ml-select" @bind="_priority">
+                    <option value="@Priority.Low">Low</option>
+                    <option value="@Priority.Medium" selected>Medium</option>
+                    <option value="@Priority.High">High</option>
+                    <option value="@Priority.Critical">Critical</option>
+                </select>
+            </div>
+            <div class="ml-form-group">
+                <label class="ml-label">Due Date</label>
+                <input class="ml-input" type="date" @bind="_dueDate" />
+            </div>
+        </div>
+
+        <div class="ml-form-group">
+            <label class="ml-label">Description *</label>
+            <textarea class="ml-textarea" @bind="_description"
+                      placeholder="Describe the issue, required work, safety concerns, parts needed..."></textarea>
+        </div>
+
+        <hr class="ml-divider" />
+
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="ml-btn ml-btn-ghost" @onclick='() => Nav.NavigateTo("/workorders")'>
+                CANCEL
+            </button>
+            <button class="ml-btn ml-btn-ghost" @onclick="SaveDraft" disabled="@_saving">
+                💾 SAVE DRAFT
+            </button>
+            <button class="ml-btn ml-btn-primary" @onclick="Submit" disabled="@_saving">
+                @if (_saving)
+                {
+                    <span class="ml-spinner"></span>
+                    <span>SUBMITTING...</span>
+                }
+                else
+                {
+                    <span>SUBMIT FOR REVIEW →</span>
+                }
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    string _title = "", _system = "", _description = "", _error = "", _success = "";
+    Priority _priority = Priority.Medium;
+    DateTime? _dueDate;
+    bool _saving;
+
+    bool Validate()
+    {
+        if (string.IsNullOrWhiteSpace(_title)) { _error = "Title is required."; return false; }
+        if (string.IsNullOrWhiteSpace(_system)) { _error = "System is required."; return false; }
+        if (string.IsNullOrWhiteSpace(_description)) { _error = "Description is required."; return false; }
+        return true;
+    }
+
+    async Task SaveDraft()
+    {
+        if (!Validate()) return;
+        _saving = true; _error = "";
+        try
+        {
+            var result = await Api.CreateWorkOrderAsync(new CreateWorkOrderDto(_title, _description, _priority, _system, _dueDate));
+            if (result != null) Nav.NavigateTo($"/workorders/{result.Id}");
+        }
+        catch { _error = "Failed to save. Check connection."; }
+        finally { _saving = false; }
+    }
+
+    async Task Submit()
+    {
+        if (!Validate()) return;
+        _saving = true; _error = "";
+        try
+        {
+            var result = await Api.CreateWorkOrderAsync(new CreateWorkOrderDto(_title, _description, _priority, _system, _dueDate));
+            if (result != null)
+            {
+                await Api.SubmitAsync(result.Id);
+                Nav.NavigateTo($"/workorders/{result.Id}");
+            }
+        }
+        catch { _error = "Failed to submit. Check connection."; }
+        finally { _saving = false; }
+    }
+}

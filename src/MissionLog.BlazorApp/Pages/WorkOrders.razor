@@ -1,0 +1,161 @@
+@page "/workorders"
+@inject ApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>MissionLog — Work Orders</PageTitle>
+
+<div class="ml-page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+        <div class="ml-breadcrumb">// OPERATIONS / WORK ORDERS</div>
+        <div class="ml-page-title">Work Orders</div>
+        <div class="ml-page-sub">@(_filtered?.Count ?? 0) orders — filtered view</div>
+    </div>
+    <button class="ml-btn ml-btn-primary" @onclick='() => Nav.NavigateTo("/workorders/new")'>
+        + NEW ORDER
+    </button>
+</div>
+
+<div class="ml-filters">
+    <button class="ml-filter-btn @(_activeFilter == null ? "active" : "")" @onclick='() => SetFilter(null)'>ALL</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.Draft ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.Draft)'>DRAFT</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.Submitted ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.Submitted)'>SUBMITTED</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.UnderReview ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.UnderReview)'>REVIEW</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.Approved ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.Approved)'>APPROVED</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.InProgress ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.InProgress)'>IN PROGRESS</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.Completed ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.Completed)'>COMPLETED</button>
+    <button class="ml-filter-btn @(_activeFilter == WorkOrderStatus.Rejected ? "active" : "")" @onclick='() => SetFilter(WorkOrderStatus.Rejected)'>REJECTED</button>
+
+    <div style="margin-left:auto">
+        <input class="ml-input" style="width:200px;padding:5px 10px;font-size:12px"
+               placeholder="Search..." @oninput="OnSearch" />
+    </div>
+</div>
+
+<div class="ml-card" style="padding:0">
+    @if (_loading)
+    {
+        <div class="ml-loading"><div class="ml-spinner"></div> LOADING...</div>
+    }
+    else if (_filtered != null && _filtered.Any())
+    {
+        <div class="ml-table-wrap">
+            <table class="ml-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>System</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Due Date</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var wo in _filtered)
+                    {
+                        <tr @onclick='() => Nav.NavigateTo($"/workorders/{wo.Id}")'>
+                            <td><span class="ml-mono ml-text-cyan" style="font-size:11px">WO-@wo.Id.ToString("D4")</span></td>
+                            <td style="max-width:250px">
+                                <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500">@wo.Title</div>
+                                <div style="font-size:11px;color:var(--ml-text-muted)">@wo.CreatedBy</div>
+                            </td>
+                            <td><span class="ml-text-dim">@wo.System</span></td>
+                            <td>
+                                <span class="ml-priority-@wo.Priority.ToString().ToLower()">
+                                    @PriorityIcon(wo.Priority) @wo.Priority
+                                </span>
+                            </td>
+                            <td>@StatusBadge(wo.Status)</td>
+                            <td><span class="ml-text-dim">@(wo.AssignedTo ?? "—")</span></td>
+                            <td>
+                                @if (wo.DueDate.HasValue)
+                                {
+                                    var overdue = wo.DueDate.Value < DateTime.UtcNow && wo.Status != WorkOrderStatus.Completed;
+                                    <span class="ml-mono @(overdue ? "ml-text-red" : "ml-text-muted")" style="font-size:11px">
+                                        @wo.DueDate.Value.ToString("MM/dd/yy")
+                                    </span>
+                                }
+                                else { <span class="ml-text-muted">—</span> }
+                            </td>
+                            <td><span class="ml-mono ml-text-muted" style="font-size:11px">@wo.CreatedAt.ToString("MM/dd HH:mm")</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="ml-empty">
+            <div class="ml-empty-icon">📋</div>
+            <div class="ml-empty-text">NO WORK ORDERS MATCH THIS FILTER</div>
+        </div>
+    }
+</div>
+
+@code {
+    List<WorkOrderDto>? _all, _filtered;
+    WorkOrderStatus? _activeFilter;
+    string _search = "";
+    bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrders();
+    }
+
+    async Task LoadOrders()
+    {
+        _loading = true;
+        try { _all = await Api.GetWorkOrdersAsync(); ApplyFilter(); }
+        catch { }
+        finally { _loading = false; }
+    }
+
+    void SetFilter(WorkOrderStatus? status)
+    {
+        _activeFilter = status;
+        ApplyFilter();
+    }
+
+    void OnSearch(ChangeEventArgs e)
+    {
+        _search = e.Value?.ToString() ?? "";
+        ApplyFilter();
+    }
+
+    void ApplyFilter()
+    {
+        if (_all == null) { _filtered = null; return; }
+        _filtered = _all
+            .Where(wo => _activeFilter == null || wo.Status == _activeFilter)
+            .Where(wo => string.IsNullOrEmpty(_search) ||
+                wo.Title.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                wo.System.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                wo.CreatedBy.Contains(_search, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    string PriorityIcon(Priority p) => p switch
+    {
+        Priority.Critical => "🔴",
+        Priority.High     => "🟠",
+        Priority.Medium   => "🟡",
+        Priority.Low      => "⚪",
+        _ => ""
+    };
+
+    RenderFragment StatusBadge(WorkOrderStatus s) => s switch
+    {
+        WorkOrderStatus.Draft       => @<span class="ml-badge ml-badge-draft">Draft</span>,
+        WorkOrderStatus.Submitted   => @<span class="ml-badge ml-badge-submitted">Submitted</span>,
+        WorkOrderStatus.UnderReview => @<span class="ml-badge ml-badge-review">Review</span>,
+        WorkOrderStatus.Approved    => @<span class="ml-badge ml-badge-approved">Approved</span>,
+        WorkOrderStatus.InProgress  => @<span class="ml-badge ml-badge-progress">In Progress</span>,
+        WorkOrderStatus.Completed   => @<span class="ml-badge ml-badge-completed">Completed</span>,
+        WorkOrderStatus.Rejected    => @<span class="ml-badge ml-badge-rejected">Rejected</span>,
+        _ => @<span class="ml-badge ml-badge-draft">@s</span>
+    };
+}

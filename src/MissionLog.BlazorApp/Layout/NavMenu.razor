@@ -1,39 +1,63 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">MissionLog.BlazorApp</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-    </div>
-</div>
+@inject AuthStateService Auth
+@inject NavigationManager Nav
 
-<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+<nav class="ml-sidebar">
+    <div class="ml-sidebar-logo">
+        <div class="ml-logo-hex">MISSIONLOG</div>
+        <div class="ml-logo-sub">AEROSPACE MRO SYSTEM</div>
+    </div>
+
+    <div class="ml-nav">
+        <div class="ml-nav-section">Operations</div>
+        <a class="ml-nav-item @IsActive("/")" @onclick='() => Go("/")'>
+            <span class="ml-nav-icon">◈</span> Dashboard
+        </a>
+        <a class="ml-nav-item @IsActive("/workorders")" @onclick='() => Go("/workorders")'>
+            <span class="ml-nav-icon">≡</span> Work Orders
+        </a>
+        <a class="ml-nav-item @IsActive("/activity")" @onclick='() => Go("/activity")'>
+            <span class="ml-nav-icon">⚡</span> Live Activity
+        </a>
+
+        <div class="ml-nav-section">Actions</div>
+        <a class="ml-nav-item @IsActive("/workorders/new")" @onclick='() => Go("/workorders/new")'>
+            <span class="ml-nav-icon">+</span> New Work Order
+        </a>
+    </div>
+
+    <div class="ml-sidebar-footer">
+        @if (Auth.CurrentUser != null)
+        {
+            <div class="ml-user-chip">
+                <div class="ml-user-avatar">@Auth.CurrentUser.Username[0].ToString().ToUpper()</div>
+                <div>
+                    <div class="ml-user-name">@Auth.CurrentUser.Username</div>
+                    <div class="ml-user-role">@Auth.CurrentUser.Role.ToUpper()</div>
+                </div>
+                <button class="ml-logout-btn" @onclick="Logout" title="Logout">⏻</button>
+            </div>
+        }
+    </div>
+</nav>
 
 @code {
-    private bool collapseNavMenu = true;
-
-    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
-
-    private void ToggleNavMenu()
+    private string IsActive(string path)
     {
-        collapseNavMenu = !collapseNavMenu;
+        var current = Nav.ToBaseRelativePath(Nav.Uri);
+        var check = path.TrimStart('/');
+        if (path == "/" && current == "") return "active";
+        if (path != "/" && current.StartsWith(check)) return "active";
+        return "";
+    }
+
+    private void Go(string path)
+    {
+        Nav.NavigateTo(path);
+    }
+
+    private void Logout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login");
     }
 }

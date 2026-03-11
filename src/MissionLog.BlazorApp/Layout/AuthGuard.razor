@@ -1,0 +1,18 @@
+@inject AuthStateService Auth
+@inject NavigationManager Nav
+
+@if (Auth.IsAuthenticated)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnInitialized()
+    {
+        var path = Nav.ToBaseRelativePath(Nav.Uri);
+        if (!Auth.IsAuthenticated && path != "login")
+            Nav.NavigateTo("/login");
+    }
+}

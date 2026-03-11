@@ -1,0 +1,84 @@
+@page "/login"
+@inject AuthStateService Auth
+@inject ApiService Api
+@inject NavigationManager Nav
+
+<PageTitle>MissionLog — Login</PageTitle>
+
+<div class="ml-auth-bg">
+    <div class="ml-auth-card">
+        <div class="ml-auth-logo">⬡ MISSIONLOG</div>
+        <div class="ml-auth-sub">AEROSPACE MRO SYSTEM — SECURE ACCESS</div>
+
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="ml-alert ml-alert-error">⚠ @_error</div>
+        }
+
+        <div class="ml-form-group">
+            <label class="ml-label">Username</label>
+            <input class="ml-input" @bind="_username" placeholder="Enter username" />
+        </div>
+        <div class="ml-form-group">
+            <label class="ml-label">Password</label>
+            <input class="ml-input" type="password" @bind="_password"
+                   @onkeydown="OnKeyDown" placeholder="Enter password" />
+        </div>
+
+        <button class="ml-btn ml-btn-primary" style="width:100%;justify-content:center;margin-top:8px"
+                @onclick="DoLogin" disabled="@_loading">
+            @if (_loading)
+            {
+                <span class="ml-spinner"></span>
+                <span>AUTHENTICATING...</span>
+            }
+            else
+            {
+                <span>ACCESS SYSTEM</span>
+            }
+        </button>
+
+        <hr class="ml-divider" />
+        <div style="font-family:var(--ml-mono);font-size:10px;color:var(--ml-text-muted);letter-spacing:0.1em">
+            DEMO CREDENTIALS<br /><br />
+            admin / Admin123! &nbsp;|&nbsp; supervisor / Super123!<br />
+            engineer / Eng123! &nbsp;|&nbsp; technician / Tech123!
+        </div>
+    </div>
+</div>
+
+@code {
+    string _username = "", _password = "", _error = "";
+    bool _loading;
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsAuthenticated) Nav.NavigateTo("/");
+    }
+
+    async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+
+    async Task DoLogin()
+    {
+        if (string.IsNullOrWhiteSpace(_username) || string.IsNullOrWhiteSpace(_password))
+        {
+            _error = "Username and password required."; return;
+        }
+        _loading = true; _error = "";
+        try
+        {
+            var result = await Api.LoginAsync(new LoginDto(_username, _password));
+            if (result != null)
+            {
+                Auth.SetUser(result);
+                Nav.NavigateTo("/");
+            }
+            else { _error = "Invalid credentials."; }
+        }
+        catch { _error = "Connection failed. Is the API running?"; }
+        finally { _loading = false; }
+    }
+}

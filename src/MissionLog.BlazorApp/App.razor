@@ -1,12 +1,18 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        <AuthGuard>
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        </AuthGuard>
     </Found>
     <NotFound>
-        <PageTitle>Not found</PageTitle>
+        <PageTitle>Not Found</PageTitle>
         <LayoutView Layout="@typeof(MainLayout)">
-            <p role="alert">Sorry, there's nothing at this address.</p>
+            <div class="ml-main">
+                <div class="ml-empty">
+                    <div class="ml-empty-icon">⚠</div>
+                    <div class="ml-empty-text">ROUTE NOT FOUND</div>
+                </div>
+            </div>
         </LayoutView>
     </NotFound>
 </Router>
