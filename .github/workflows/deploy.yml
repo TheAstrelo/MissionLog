@@ -1,4 +1,4 @@
-name: Deploy to Azure
+name: Deploy
 
 on:
   workflow_run:
@@ -12,14 +12,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  deploy-blazor:
+    name: Deploy Blazor → Cloudflare Pages
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
@@ -32,22 +31,7 @@ jobs:
     - name: Restore
       run: dotnet restore MissionLog.sln
 
-    # ── API ────────────────────────────────────────────────────────────────────
-
-    - name: Publish API
-      run: dotnet publish src/MissionLog.API/MissionLog.API.csproj \
-        -c Release --no-restore -o ./publish/api
-
-    - name: Deploy API to Azure App Service
-      uses: azure/webapps-deploy@v3
-      with:
-        app-name: missionlog-api
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ./publish/api
-
-    # ── Blazor ─────────────────────────────────────────────────────────────────
-
-    - name: Inject production API URL into Blazor config
+    - name: Inject production API URL
       run: |
         sed -i 's|#{API_BASE_URL}#|${{ secrets.API_BASE_URL }}|g' \
           src/MissionLog.BlazorApp/wwwroot/appsettings.Production.json
@@ -56,24 +40,33 @@ jobs:
       run: dotnet publish src/MissionLog.BlazorApp/MissionLog.BlazorApp.csproj \
         -c Release --no-restore -o ./publish/blazor
 
-    - name: Deploy Blazor to Azure Static Web Apps
-      uses: Azure/static-web-apps-deploy@v1
+    - name: Deploy to Cloudflare Pages
+      uses: cloudflare/wrangler-action@v3
       with:
-        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        action: upload
-        app_location: ./publish/blazor/wwwroot
-        skip_app_build: true
-        output_location: ""
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        command: pages deploy ./publish/blazor/wwwroot --project-name=missionlog --commit-dirty=true
 
-    # ── Summary ────────────────────────────────────────────────────────────────
-
-    - name: Deployment summary
+  deploy-api:
+    name: Deploy API → Railway
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Railway auto-deploys from GitHub — this job just signals success
+    # Railway watches main branch and triggers its own build via Dockerfile
+    steps:
+    - name: Railway deploys automatically
       run: |
-        echo "## 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
-        echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
-        echo "| API | ${{ secrets.API_BASE_URL }} |" >> $GITHUB_STEP_SUMMARY
-        echo "| Swagger | ${{ secrets.API_BASE_URL }}/swagger |" >> $GITHUB_STEP_SUMMARY
-        echo "| Blazor App | *(check Azure Static Web Apps portal)* |" >> $GITHUB_STEP_SUMMARY
+        echo "Railway is configured to watch this repo."
+        echo "It will auto-build via Dockerfile on every push to main."
+        echo "No manual step needed here."
+        echo ""
+        echo "API URL: ${{ secrets.API_BASE_URL }}"
+
+    - name: Summary
+      run: |
+        echo "## 🚀 Deploy triggered" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | Platform | URL |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|----------|-----|" >> $GITHUB_STEP_SUMMARY
+        echo "| API | Railway | ${{ secrets.API_BASE_URL }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Blazor | Cloudflare Pages | *(see CF dashboard)* |" >> $GITHUB_STEP_SUMMARY
+        echo "| Swagger | Railway | ${{ secrets.API_BASE_URL }}/swagger |" >> $GITHUB_STEP_SUMMARY

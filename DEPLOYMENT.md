@@ -1,134 +1,164 @@
-# 🚀 MissionLog — Azure Deployment Guide
+# 🚀 MissionLog — Deployment Guide
 
-## Prerequisites
-
-1. [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) installed
-2. [Free Azure account](https://azure.microsoft.com/en-us/free/) (or existing subscription)
-3. Logged in: `az login`
+**Stack:** Railway (API + Postgres) + Cloudflare Pages (Blazor)
+**Cost:** Free on both platforms. No credit card required for Railway hobby tier.
+**Time:** ~15 minutes end to end.
 
 ---
 
-## Step 1 — Run the Bootstrap Script
+## Architecture
 
-This is a **one-time setup** that creates all Azure resources.
-
-```bash
-# Make executable
-chmod +x azure-bootstrap.sh
-
-# Edit the top of the file first:
-#   API_APP_NAME  → must be globally unique (e.g. missionlog-api-yourname)
-#   SQL_SERVER_NAME → must be globally unique (e.g. missionlog-sql-yourname)
-#   SQL_ADMIN_PASS → change to a strong password
-
-./azure-bootstrap.sh
+```
+Browser
+  │
+  ├── Cloudflare Pages (free, global CDN)
+  │     └── Blazor WASM static files
+  │           └── calls →
+  │
+  └── Railway (free hobby tier)
+        ├── ASP.NET Core 8 API  (Dockerfile build)
+        └── Postgres DB         (Railway managed)
 ```
 
-The script will:
-- Create a Resource Group
-- Create a **Free F1 App Service** for the API
-- Create an **Azure SQL Serverless** database (auto-pauses when idle)
-- Create an **Azure Static Web App** for Blazor (free tier, global CDN)
-- Configure all environment variables on the API
-- Output the 3 GitHub secrets you need to paste
-
-**Estimated time:** ~5 minutes
-
 ---
 
-## Step 2 — Add GitHub Secrets
+## Step 1 — Deploy API to Railway
 
-Go to: `https://github.com/TheAstrelo/MissionLog/settings/secrets/actions`
+### 1a. Create Railway account
+Go to [railway.app](https://railway.app) → Sign up with GitHub (free, no credit card).
 
-Add these 3 secrets from the bootstrap script output:
+### 1b. Create a new project
+```
+Railway dashboard → New Project → Deploy from GitHub repo
+→ Select: TheAstrelo/MissionLog
+→ Railway detects Dockerfile automatically
+```
 
-| Secret Name | Value |
+### 1c. Add Postgres database
+```
+Railway project → New Service → Database → PostgreSQL
+→ Railway creates the DB and sets DATABASE_URL automatically
+```
+
+### 1d. Set environment variables
+In your API service on Railway → Variables → Add:
+
+| Variable | Value |
 |---|---|
-| `AZURE_WEBAPP_PUBLISH_PROFILE` | XML blob from bootstrap output |
-| `AZURE_STATIC_WEB_APPS_API_TOKEN` | Token from bootstrap output |
-| `API_BASE_URL` | `https://missionlog-api.azurewebsites.net` |
+| `JWT__KEY` | Any random 40+ char string — e.g. `openssl rand -base64 40` |
+| `CORS__ALLOWEDORIGINS` | Your Cloudflare Pages URL (add after Step 2) |
+
+Railway automatically provides `DATABASE_URL` and `PORT` — you don't set those.
+
+### 1e. Get your API URL
+```
+Railway → your API service → Settings → Networking → Generate Domain
+→ Copy: https://missionlog-api-xxxx.up.railway.app
+```
 
 ---
 
-## Step 3 — Push to Deploy
+## Step 2 — Deploy Blazor to Cloudflare Pages
 
+### 2a. Create Cloudflare account
+Go to [pages.cloudflare.com](https://pages.cloudflare.com) → Sign up free.
+
+### 2b. Connect GitHub repo
+```
+Cloudflare Pages → Create application → Connect to Git
+→ Select: TheAstrelo/MissionLog
+→ Framework preset: None (we handle the build in CI)
+```
+
+### 2c. Build settings
+```
+Build command:    (leave blank — we push pre-built output via wrangler)
+Output directory: publish/blazor/wwwroot
+```
+
+> Actually the deploy workflow pushes the pre-built output via wrangler — no build config needed in CF.
+
+---
+
+## Step 3 — Wire it all together
+
+### Add GitHub Secrets
+`github.com/TheAstrelo/MissionLog/settings/secrets/actions`
+
+| Secret | Where to get it |
+|---|---|
+| `API_BASE_URL` | Railway API domain from Step 1e |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers" template |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare → Workers & Pages → right sidebar |
+
+### Update CORS on Railway
+Once you have your Cloudflare Pages URL:
+```
+Railway → API service → Variables → CORS__ALLOWEDORIGINS
+→ Set to: https://missionlog.pages.dev   (your actual CF URL)
+```
+
+### Push to deploy
 ```bash
 git push origin main
 ```
+CI runs → passes → deploy workflow fires → Blazor publishes to Cloudflare Pages.
+Railway auto-detects the push and rebuilds the API via Dockerfile simultaneously.
 
-The CI pipeline runs first → if it passes, the deploy pipeline fires automatically.
+---
 
-**What deploys where:**
+## Demo credentials (seeded automatically)
 
-| Component | Azure Service | URL |
+| Username | Password | Role |
 |---|---|---|
-| ASP.NET Core API | App Service (F1 Free) | `https://missionlog-api.azurewebsites.net` |
-| Swagger UI | App Service | `https://missionlog-api.azurewebsites.net/swagger` |
-| Blazor WASM | Static Web Apps (Free) | `https://<auto-name>.azurestaticapps.net` |
-| Database | Azure SQL Serverless | Internal to App Service |
+| `admin` | `Admin123!` | Admin |
+| `supervisor` | `Super123!` | Supervisor |
+| `engineer` | `Eng123!` | Engineer |
+| `tech` | `Tech123!` | Technician |
 
 ---
 
-## Step 4 — Custom Domain (Optional)
+## Local development (Postgres via Docker)
 
-### Blazor (Static Web Apps — free custom domain)
-```
-Azure Portal → Static Web Apps → missionlog-blazor → Custom domains → Add
-```
-
-### API (App Service — requires paid tier for custom domain)
-Free F1 tier does not support custom domains on the API.
-Upgrade to B1 (~$13/month) if you need `api.yourdomain.com`.
-
----
-
-## Environment Variables Reference
-
-These are set automatically by the bootstrap script on the API App Service:
-
-| Variable | Description |
-|---|---|
-| `ASPNETCORE_ENVIRONMENT` | `Production` |
-| `ConnectionStrings__DefaultConnection` | Azure SQL connection string |
-| `Jwt__Key` | JWT signing secret (auto-generated) |
-| `Jwt__Issuer` | `MissionLog.API` |
-| `Jwt__Audience` | `MissionLog.BlazorApp` |
-| `Cors__AllowedOrigins` | Static Web App URL |
-
-To update any value:
-```bash
-az webapp config appsettings set \
-  --name missionlog-api \
-  --resource-group missionlog-rg \
-  --settings "Key=Value"
-```
-
----
-
-## Tear Down (Stop Billing)
+If you want to dev against Postgres locally instead of SQL Server Express:
 
 ```bash
-# Delete everything — one command
-az group delete --name missionlog-rg --yes --no-wait
+# Start Postgres
+docker run -d \
+  --name missionlog-db \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=MissionLogDb \
+  -p 5432:5432 \
+  postgres:16
+
+# Run API
+cd src/MissionLog.API
+dotnet run
 ```
 
-Free tier resources have no ongoing cost, but this is useful if you want a clean slate.
+appsettings.json already has the right connection string for this setup.
+
+---
+
+## Tear down
+
+```
+Railway dashboard → Project → Settings → Delete Project
+Cloudflare Pages → your project → Settings → Delete project
+```
 
 ---
 
 ## Troubleshooting
 
-**API returns 500 on first request after deploy**
-→ Azure SQL serverless auto-pauses. First request wakes it up — takes ~10 seconds.
+**First request to API is slow (~5-10s)**
+Railway free tier spins down after 30 min of inactivity. First request wakes it up.
 
-**Blazor routing 404 on page refresh**
-→ `staticwebapp.config.json` handles this via `navigationFallback`. If still failing, check it was included in the publish output.
+**CORS error in browser console**
+`CORS__ALLOWEDORIGINS` on Railway must exactly match your Cloudflare Pages URL — no trailing slash, correct protocol (https).
 
-**SignalR not connecting**
-→ WebSockets must be enabled on App Service. Check:
-```
-Azure Portal → App Service → Configuration → General settings → Web sockets → On
-```
+**Blazor page refresh returns 404**
+`staticwebapp.config.json` handles routing fallback for Cloudflare Pages — make sure it's present in `wwwroot/`.
 
-**CORS errors in browser**
-→ Confirm `Cors__AllowedOrigins` on the API App Service exactly matches your Static Web App URL (no trailing slash).
+**Database errors on first deploy**
+EF Core runs `db.Database.Migrate()` on startup — tables are created automatically. Check Railway logs if it fails.

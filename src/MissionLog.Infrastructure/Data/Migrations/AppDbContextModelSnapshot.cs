@@ -2,8 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using MissionLog.Infrastructure.Data;
 
 #nullable disable
@@ -17,23 +16,20 @@ namespace MissionLog.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("MissionLog.Core.Entities.ApprovalAction", b =>
             {
-                b.Property<int>("Id").ValueGeneratedOnAdd()
-                    .HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                b.Property<string>("Action").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
-                b.Property<DateTime>("ActionDate").HasColumnType("datetime2");
-                b.Property<string>("Notes").HasColumnType("nvarchar(max)");
-                b.Property<int>("UserId").HasColumnType("int");
-                b.Property<int>("WorkOrderId").HasColumnType("int");
-
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<string>("Action").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+                b.Property<DateTime>("ActionDate").HasColumnType("timestamp with time zone");
+                b.Property<string>("Notes").HasColumnType("text");
+                b.Property<int>("UserId").HasColumnType("integer");
+                b.Property<int>("WorkOrderId").HasColumnType("integer");
                 b.HasKey("Id");
                 b.HasIndex("UserId");
                 b.HasIndex("WorkOrderId");
@@ -42,16 +38,14 @@ namespace MissionLog.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("MissionLog.Core.Entities.User", b =>
             {
-                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<string>("Email").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
-                b.Property<bool>("IsActive").HasColumnType("bit");
-                b.Property<string>("PasswordHash").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<string>("Role").IsRequired().HasMaxLength(50).HasColumnType("nvarchar(50)");
-                b.Property<string>("Username").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<string>("Email").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
+                b.Property<bool>("IsActive").HasColumnType("boolean");
+                b.Property<string>("PasswordHash").IsRequired().HasColumnType("text");
+                b.Property<string>("Role").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+                b.Property<string>("Username").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)");
                 b.HasKey("Id");
                 b.HasIndex("Email").IsUnique();
                 b.HasIndex("Username").IsUnique();
@@ -60,21 +54,19 @@ namespace MissionLog.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("MissionLog.Core.Entities.WorkOrder", b =>
             {
-                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                b.Property<int?>("AssignedToUserId").HasColumnType("int");
-                b.Property<DateTime?>("CompletedAt").HasColumnType("datetime2");
-                b.Property<int>("CreatedByUserId").HasColumnType("int");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<string>("Description").IsRequired().HasColumnType("nvarchar(max)");
-                b.Property<DateTime?>("DueDate").HasColumnType("datetime2");
-                b.Property<int>("Priority").HasColumnType("int");
-                b.Property<int>("Status").HasColumnType("int");
-                b.Property<string>("System").IsRequired().HasMaxLength(100).HasColumnType("nvarchar(100)");
-                b.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("nvarchar(200)");
-                b.Property<DateTime?>("UpdatedAt").HasColumnType("datetime2");
-
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<int?>("AssignedToUserId").HasColumnType("integer");
+                b.Property<DateTime?>("CompletedAt").HasColumnType("timestamp with time zone");
+                b.Property<int>("CreatedByUserId").HasColumnType("integer");
+                b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<string>("Description").IsRequired().HasColumnType("text");
+                b.Property<DateTime?>("DueDate").HasColumnType("timestamp with time zone");
+                b.Property<int>("Priority").HasColumnType("integer");
+                b.Property<int>("Status").HasColumnType("integer");
+                b.Property<string>("System").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)");
+                b.Property<string>("Title").IsRequired().HasMaxLength(200).HasColumnType("character varying(200)");
+                b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
                 b.HasKey("Id");
                 b.HasIndex("AssignedToUserId");
                 b.HasIndex("CreatedByUserId");
@@ -83,14 +75,12 @@ namespace MissionLog.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("MissionLog.Core.Entities.WorkOrderComment", b =>
             {
-                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("int");
-                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                b.Property<string>("Content").IsRequired().HasMaxLength(2000).HasColumnType("nvarchar(2000)");
-                b.Property<DateTime>("CreatedAt").HasColumnType("datetime2");
-                b.Property<int>("UserId").HasColumnType("int");
-                b.Property<int>("WorkOrderId").HasColumnType("int");
-
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<string>("Content").IsRequired().HasMaxLength(2000).HasColumnType("character varying(2000)");
+                b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.Property<int>("UserId").HasColumnType("integer");
+                b.Property<int>("WorkOrderId").HasColumnType("integer");
                 b.HasKey("Id");
                 b.HasIndex("UserId");
                 b.HasIndex("WorkOrderId");
@@ -99,68 +89,27 @@ namespace MissionLog.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("MissionLog.Core.Entities.ApprovalAction", b =>
             {
-                b.HasOne("MissionLog.Core.Entities.User", "User")
-                    .WithMany("ApprovalActions")
-                    .HasForeignKey("UserId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.HasOne("MissionLog.Core.Entities.WorkOrder", "WorkOrder")
-                    .WithMany("ApprovalActions")
-                    .HasForeignKey("WorkOrderId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired();
-
-                b.Navigation("User");
-                b.Navigation("WorkOrder");
+                b.HasOne("MissionLog.Core.Entities.User", "User").WithMany("ApprovalActions").HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                b.HasOne("MissionLog.Core.Entities.WorkOrder", "WorkOrder").WithMany("ApprovalActions").HasForeignKey("WorkOrderId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                b.Navigation("User"); b.Navigation("WorkOrder");
             });
 
             modelBuilder.Entity("MissionLog.Core.Entities.WorkOrder", b =>
             {
-                b.HasOne("MissionLog.Core.Entities.User", "AssignedTo")
-                    .WithMany()
-                    .HasForeignKey("AssignedToUserId")
-                    .OnDelete(DeleteBehavior.SetNull);
-
-                b.HasOne("MissionLog.Core.Entities.User", "CreatedBy")
-                    .WithMany("AssignedWorkOrders")
-                    .HasForeignKey("CreatedByUserId")
-                    .OnDelete(DeleteBehavior.Restrict)
-                    .IsRequired();
-
-                b.Navigation("AssignedTo");
-                b.Navigation("CreatedBy");
+                b.HasOne("MissionLog.Core.Entities.User", "AssignedTo").WithMany().HasForeignKey("AssignedToUserId").OnDelete(DeleteBehavior.SetNull);
+                b.HasOne("MissionLog.Core.Entities.User", "CreatedBy").WithMany("AssignedWorkOrders").HasForeignKey("CreatedByUserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                b.Navigation("AssignedTo"); b.Navigation("CreatedBy");
             });
 
             modelBuilder.Entity("MissionLog.Core.Entities.WorkOrderComment", b =>
             {
-                b.HasOne("MissionLog.Core.Entities.User", "User")
-                    .WithMany()
-                    .HasForeignKey("UserId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired();
-
-                b.HasOne("MissionLog.Core.Entities.WorkOrder", "WorkOrder")
-                    .WithMany("Comments")
-                    .HasForeignKey("WorkOrderId")
-                    .OnDelete(DeleteBehavior.Cascade)
-                    .IsRequired();
-
-                b.Navigation("User");
-                b.Navigation("WorkOrder");
+                b.HasOne("MissionLog.Core.Entities.User", "User").WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                b.HasOne("MissionLog.Core.Entities.WorkOrder", "WorkOrder").WithMany("Comments").HasForeignKey("WorkOrderId").OnDelete(DeleteBehavior.Cascade).IsRequired();
+                b.Navigation("User"); b.Navigation("WorkOrder");
             });
 
-            modelBuilder.Entity("MissionLog.Core.Entities.User", b =>
-            {
-                b.Navigation("ApprovalActions");
-                b.Navigation("AssignedWorkOrders");
-            });
-
-            modelBuilder.Entity("MissionLog.Core.Entities.WorkOrder", b =>
-            {
-                b.Navigation("ApprovalActions");
-                b.Navigation("Comments");
-            });
+            modelBuilder.Entity("MissionLog.Core.Entities.User", b => { b.Navigation("ApprovalActions"); b.Navigation("AssignedWorkOrders"); });
+            modelBuilder.Entity("MissionLog.Core.Entities.WorkOrder", b => { b.Navigation("ApprovalActions"); b.Navigation("Comments"); });
 #pragma warning restore 612, 618
         }
     }
