@@ -2,6 +2,14 @@ using MissionLog.Core.Enums;
 
 namespace MissionLog.Core.DTOs;
 
+public record ApprovalActionDetailDto(
+    int Id,
+    string Action,
+    string? Notes,
+    string Username,
+    DateTime ActionDate
+);
+
 public record WorkOrderDto(
     int Id,
     string Title,
@@ -13,7 +21,8 @@ public record WorkOrderDto(
     string? AssignedTo,
     DateTime CreatedAt,
     DateTime? DueDate,
-    DateTime? CompletedAt
+    DateTime? CompletedAt,
+    List<ApprovalActionDetailDto> ApprovalHistory
 );
 
 public record CreateWorkOrderDto(

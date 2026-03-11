@@ -26,6 +26,7 @@ public class WorkOrdersController : ControllerBase
 
     private int CurrentUserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string CurrentRole => User.FindFirstValue(ClaimTypes.Role)!;
+    private string CurrentUsername => User.FindFirstValue(ClaimTypes.Name)!;
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkOrderDto>>> GetAll([FromQuery] WorkOrderStatus? status)
@@ -33,7 +34,6 @@ public class WorkOrdersController : ControllerBase
         var workOrders = status.HasValue
             ? await _uow.WorkOrders.GetByStatusAsync(status.Value)
             : await _uow.WorkOrders.GetAllAsync();
-
         return Ok(workOrders.Select(MapToDto));
     }
 
@@ -47,16 +47,15 @@ public class WorkOrdersController : ControllerBase
     [HttpGet("summary")]
     public async Task<ActionResult<WorkOrderSummaryDto>> GetSummary()
     {
-        var all = await _uow.WorkOrders.GetAllAsync();
-        var list = all.ToList();
+        var all = (await _uow.WorkOrders.GetAllAsync()).ToList();
         return Ok(new WorkOrderSummaryDto(
-            Total: list.Count,
-            Draft: list.Count(w => w.Status == WorkOrderStatus.Draft),
-            UnderReview: list.Count(w => w.Status == WorkOrderStatus.UnderReview),
-            Approved: list.Count(w => w.Status == WorkOrderStatus.Approved),
-            InProgress: list.Count(w => w.Status == WorkOrderStatus.InProgress),
-            Completed: list.Count(w => w.Status == WorkOrderStatus.Completed),
-            Rejected: list.Count(w => w.Status == WorkOrderStatus.Rejected)
+            Total:       all.Count,
+            Draft:       all.Count(w => w.Status == WorkOrderStatus.Draft),
+            UnderReview: all.Count(w => w.Status == WorkOrderStatus.UnderReview),
+            Approved:    all.Count(w => w.Status == WorkOrderStatus.Approved),
+            InProgress:  all.Count(w => w.Status == WorkOrderStatus.InProgress),
+            Completed:   all.Count(w => w.Status == WorkOrderStatus.Completed),
+            Rejected:    all.Count(w => w.Status == WorkOrderStatus.Rejected)
         ));
     }
 
@@ -73,20 +72,18 @@ public class WorkOrdersController : ControllerBase
     {
         var wo = new WorkOrder
         {
-            Title = dto.Title,
-            Description = dto.Description,
-            Priority = dto.Priority,
-            System = dto.System,
-            DueDate = dto.DueDate,
+            Title           = dto.Title,
+            Description     = dto.Description,
+            Priority        = dto.Priority,
+            System          = dto.System,
+            DueDate         = dto.DueDate,
             CreatedByUserId = CurrentUserId,
-            Status = WorkOrderStatus.Draft
+            Status          = WorkOrderStatus.Draft
         };
 
         await _uow.WorkOrders.CreateAsync(wo);
         var created = await _uow.WorkOrders.GetByIdAsync(wo.Id);
-
         await _hub.Clients.Group("all-users").SendAsync("WorkOrderCreated", MapToDto(created!));
-
         return CreatedAtAction(nameof(GetById), new { id = wo.Id }, MapToDto(created!));
     }
 
@@ -99,59 +96,73 @@ public class WorkOrdersController : ControllerBase
         if (wo.CreatedByUserId != CurrentUserId && CurrentRole != "Supervisor" && CurrentRole != "Admin")
             return Forbid();
 
-        wo.Title = dto.Title;
-        wo.Description = dto.Description;
-        wo.Priority = dto.Priority;
-        wo.System = dto.System;
-        wo.DueDate = dto.DueDate;
+        wo.Title            = dto.Title;
+        wo.Description      = dto.Description;
+        wo.Priority         = dto.Priority;
+        wo.System           = dto.System;
+        wo.DueDate          = dto.DueDate;
         wo.AssignedToUserId = dto.AssignedToUserId;
 
         await _uow.WorkOrders.UpdateAsync(wo);
         var updated = await _uow.WorkOrders.GetByIdAsync(id);
-
         await _hub.Clients.Group("all-users").SendAsync("WorkOrderUpdated", MapToDto(updated!));
-
         return Ok(MapToDto(updated!));
     }
+
+    // ── Workflow transitions ─────────────────────────────────────────────────
+
+    [HttpPost("{id}/submit")]
+    public async Task<ActionResult<WorkOrderDto>> Submit(int id)
+        => await Transition(id, WorkOrderStatus.Submitted, "Submitted", null,
+            allowed: wo => wo.Status == WorkOrderStatus.Draft);
 
     [HttpPost("{id}/approve")]
     [Authorize(Roles = "Supervisor,Admin")]
     public async Task<ActionResult<WorkOrderDto>> Approve(int id, [FromBody] ApprovalActionDto dto)
-        => await TransitionStatus(id, WorkOrderStatus.Approved, dto.Action, dto.Notes);
+        => await Transition(id, WorkOrderStatus.Approved, "Approved", dto.Notes,
+            allowed: wo => wo.Status == WorkOrderStatus.Submitted || wo.Status == WorkOrderStatus.UnderReview);
 
     [HttpPost("{id}/reject")]
     [Authorize(Roles = "Supervisor,Admin")]
     public async Task<ActionResult<WorkOrderDto>> Reject(int id, [FromBody] ApprovalActionDto dto)
-        => await TransitionStatus(id, WorkOrderStatus.Rejected, dto.Action, dto.Notes);
-
-    [HttpPost("{id}/submit")]
-    public async Task<ActionResult<WorkOrderDto>> Submit(int id)
-        => await TransitionStatus(id, WorkOrderStatus.Submitted, "Submitted", null);
+        => await Transition(id, WorkOrderStatus.Rejected, "Rejected", dto.Notes,
+            allowed: wo => wo.Status == WorkOrderStatus.Submitted || wo.Status == WorkOrderStatus.UnderReview);
 
     [HttpPost("{id}/start")]
-    [Authorize(Roles = "Engineer,Supervisor,Admin")]
+    [Authorize(Roles = "Engineer,Technician,Supervisor,Admin")]
     public async Task<ActionResult<WorkOrderDto>> Start(int id)
-        => await TransitionStatus(id, WorkOrderStatus.InProgress, "Started", null);
+        => await Transition(id, WorkOrderStatus.InProgress, "Started", null,
+            allowed: wo => wo.Status == WorkOrderStatus.Approved);
 
     [HttpPost("{id}/complete")]
     public async Task<ActionResult<WorkOrderDto>> Complete(int id)
-        => await TransitionStatus(id, WorkOrderStatus.Completed, "Completed", null);
+        => await Transition(id, WorkOrderStatus.Completed, "Completed", null,
+            allowed: wo => wo.Status == WorkOrderStatus.InProgress);
 
-    private async Task<ActionResult<WorkOrderDto>> TransitionStatus(
-        int id, WorkOrderStatus newStatus, string action, string? notes)
+    // ── Shared transition helper ─────────────────────────────────────────────
+
+    private async Task<ActionResult<WorkOrderDto>> Transition(
+        int id,
+        WorkOrderStatus newStatus,
+        string action,
+        string? notes,
+        Func<WorkOrder, bool> allowed)
     {
         var wo = await _uow.WorkOrders.GetByIdAsync(id);
         if (wo == null) return NotFound();
+        if (!allowed(wo)) return BadRequest(new { message = $"Cannot transition from {wo.Status} to {newStatus}." });
 
-        wo.Status = newStatus;
+        wo.Status    = newStatus;
+        wo.UpdatedAt = DateTime.UtcNow;
         if (newStatus == WorkOrderStatus.Completed) wo.CompletedAt = DateTime.UtcNow;
 
         wo.ApprovalActions.Add(new ApprovalAction
         {
             WorkOrderId = id,
-            UserId = CurrentUserId,
-            Action = action,
-            Notes = notes
+            UserId      = CurrentUserId,
+            Action      = action,
+            Notes       = notes,
+            ActionDate  = DateTime.UtcNow
         });
 
         await _uow.WorkOrders.UpdateAsync(wo);
@@ -159,14 +170,16 @@ public class WorkOrdersController : ControllerBase
 
         await _hub.Clients.Group("all-users").SendAsync("WorkOrderStatusChanged", new
         {
-            Id = id,
+            Id        = id,
             NewStatus = newStatus.ToString(),
-            Action = action,
-            UpdatedBy = User.FindFirstValue(ClaimTypes.Name)
+            Action    = action,
+            UpdatedBy = CurrentUsername
         });
 
         return Ok(MapToDto(updated!));
     }
+
+    // ── Mapping ──────────────────────────────────────────────────────────────
 
     private static WorkOrderDto MapToDto(WorkOrder wo) => new(
         wo.Id,
@@ -179,6 +192,15 @@ public class WorkOrdersController : ControllerBase
         wo.AssignedTo?.Username,
         wo.CreatedAt,
         wo.DueDate,
-        wo.CompletedAt
+        wo.CompletedAt,
+        wo.ApprovalActions
+            .OrderBy(a => a.ActionDate)
+            .Select(a => new ApprovalActionDetailDto(
+                a.Id,
+                a.Action,
+                a.Notes,
+                a.User?.Username ?? "Unknown",
+                a.ActionDate))
+            .ToList()
     );
 }

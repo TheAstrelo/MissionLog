@@ -11,14 +11,19 @@
 }
 else if (_wo == null)
 {
-    <div class="ml-empty"><div class="ml-empty-icon">⚠</div><div class="ml-empty-text">WORK ORDER NOT FOUND</div></div>
+    <div class="ml-empty">
+        <div class="ml-empty-icon">⚠</div>
+        <div class="ml-empty-text">WORK ORDER NOT FOUND</div>
+    </div>
 }
 else
 {
     <div class="ml-page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
         <div>
             <div class="ml-breadcrumb">
-                <span @onclick='() => Nav.NavigateTo("/workorders")' style="cursor:pointer">// WORK ORDERS</span>
+                <span @onclick='() => Nav.NavigateTo("/workorders")' style="cursor:pointer;text-decoration:underline">
+                    // WORK ORDERS
+                </span>
                 &nbsp;/ WO-@_wo.Id.ToString("D4")
             </div>
             <div class="ml-page-title">@_wo.Title</div>
@@ -30,25 +35,27 @@ else
                 <span class="ml-mono ml-text-muted" style="font-size:11px">@_wo.System</span>
             </div>
         </div>
-        <!-- Action Buttons -->
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+
+        <!-- Action buttons — shown based on status + role -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
             @if (_wo.Status == WorkOrderStatus.Draft && _wo.CreatedBy == Auth.CurrentUser?.Username)
             {
                 <button class="ml-btn ml-btn-primary ml-btn-sm" @onclick="DoSubmit" disabled="@_acting">
-                    SUBMIT FOR REVIEW
+                    → SUBMIT FOR REVIEW
                 </button>
             }
             @if (_wo.Status == WorkOrderStatus.Submitted &&
-                (Auth.CurrentUser?.Role == "Supervisor" || Auth.CurrentUser?.Role == "Admin"))
+                (Auth.CurrentUser?.Role is "Supervisor" or "Admin"))
             {
-                <button class="ml-btn ml-btn-success ml-btn-sm" @onclick='() => ShowApprovalModal(true)'>
+                <button class="ml-btn ml-btn-success ml-btn-sm" @onclick='() => ShowApprovalModal(true)' disabled="@_acting">
                     ✓ APPROVE
                 </button>
-                <button class="ml-btn ml-btn-danger ml-btn-sm" @onclick='() => ShowApprovalModal(false)'>
+                <button class="ml-btn ml-btn-danger ml-btn-sm" @onclick='() => ShowApprovalModal(false)' disabled="@_acting">
                     ✕ REJECT
                 </button>
             }
-            @if (_wo.Status == WorkOrderStatus.Approved)
+            @if (_wo.Status == WorkOrderStatus.Approved &&
+                (Auth.CurrentUser?.Role is "Engineer" or "Technician" or "Supervisor" or "Admin"))
             {
                 <button class="ml-btn ml-btn-ghost ml-btn-sm" @onclick="DoStart" disabled="@_acting">
                     ▶ START WORK
@@ -57,7 +64,7 @@ else
             @if (_wo.Status == WorkOrderStatus.InProgress)
             {
                 <button class="ml-btn ml-btn-success ml-btn-sm" @onclick="DoComplete" disabled="@_acting">
-                    ✓ MARK COMPLETE
+                    ★ MARK COMPLETE
                 </button>
             }
         </div>
@@ -65,39 +72,57 @@ else
 
     @if (!string.IsNullOrEmpty(_msg))
     {
-        <div class="ml-alert @(_isError ? "ml-alert-error" : "ml-alert-success")">@_msg</div>
+        <div class="ml-alert @(_isError ? "ml-alert-error" : "ml-alert-success")" style="max-width:720px">
+            @_msg
+        </div>
     }
 
-    <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start;flex-wrap:wrap">
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+
         <!-- Left column -->
         <div style="display:flex;flex-direction:column;gap:20px">
+
             <!-- Description -->
             <div class="ml-card">
                 <div class="ml-card-title" style="margin-bottom:12px">DESCRIPTION</div>
-                <div style="color:var(--ml-text);line-height:1.7;white-space:pre-wrap">@_wo.Description</div>
+                <div style="color:var(--ml-text);line-height:1.8;white-space:pre-wrap;font-size:13px">@_wo.Description</div>
             </div>
 
             <!-- Approval History -->
             <div class="ml-card">
                 <div class="ml-card-header">
                     <div class="ml-card-title">APPROVAL HISTORY</div>
+                    <span class="ml-mono ml-text-muted" style="font-size:10px">
+                        @_wo.ApprovalHistory.Count EVENT@(_wo.ApprovalHistory.Count != 1 ? "S" : "")
+                    </span>
                 </div>
-                @if (_history.Any())
+                @if (_wo.ApprovalHistory.Any())
                 {
                     <div class="ml-timeline">
-                        @foreach (var action in _history)
+                        @foreach (var action in _wo.ApprovalHistory)
                         {
                             <div class="ml-timeline-item">
-                                <div class="ml-timeline-dot @ActionClass(action.Action)">
+                                <div class="ml-timeline-dot @ActionDotClass(action.Action)">
                                     @ActionIcon(action.Action)
                                 </div>
                                 <div class="ml-timeline-content">
-                                    <div class="ml-timeline-title">@action.Action</div>
+                                    <div class="ml-timeline-title">
+                                        @action.Action
+                                        <span class="ml-mono ml-text-muted" style="font-size:10px;margin-left:8px">
+                                            by @action.Username
+                                        </span>
+                                    </div>
                                     @if (!string.IsNullOrEmpty(action.Notes))
                                     {
-                                        <div style="font-size:12px;color:var(--ml-text-dim);margin:3px 0">@action.Notes</div>
+                                        <div style="font-size:12px;color:var(--ml-text-dim);margin:4px 0 2px;
+                                                    background:rgba(255,255,255,0.03);padding:6px 10px;
+                                                    border-radius:4px;border-left:2px solid var(--ml-border-bright)">
+                                            "@action.Notes"
+                                        </div>
                                     }
-                                    <div class="ml-timeline-meta">@action.ActionDate.ToString("MM/dd/yyyy HH:mm UTC")</div>
+                                    <div class="ml-timeline-meta">
+                                        @action.ActionDate.ToString("MM/dd/yyyy HH:mm") UTC
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -106,6 +131,7 @@ else
                 else
                 {
                     <div class="ml-empty" style="padding:24px">
+                        <div class="ml-empty-icon">📋</div>
                         <div class="ml-empty-text">NO ACTIONS YET</div>
                     </div>
                 }
@@ -113,77 +139,115 @@ else
         </div>
 
         <!-- Right column — metadata -->
-        <div class="ml-card">
-            <div class="ml-card-title" style="margin-bottom:16px">ORDER METADATA</div>
-            <div class="ml-detail-grid">
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Order ID</div>
-                    <div class="ml-detail-val ml-mono ml-text-cyan">WO-@_wo.Id.ToString("D4")</div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Status</div>
-                    <div class="ml-detail-val">@StatusBadge(_wo.Status)</div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">System</div>
-                    <div class="ml-detail-val">@_wo.System</div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Priority</div>
-                    <div class="ml-detail-val">
-                        <span class="ml-priority-@_wo.Priority.ToString().ToLower()">@_wo.Priority</span>
+        <div style="display:flex;flex-direction:column;gap:16px">
+            <div class="ml-card">
+                <div class="ml-card-title" style="margin-bottom:16px">ORDER METADATA</div>
+                <div style="display:flex;flex-direction:column;gap:14px">
+                    <div>
+                        <div class="ml-detail-key">Order ID</div>
+                        <div class="ml-detail-val ml-mono ml-text-cyan">WO-@_wo.Id.ToString("D4")</div>
                     </div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Created By</div>
-                    <div class="ml-detail-val">@_wo.CreatedBy</div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Assigned To</div>
-                    <div class="ml-detail-val">@(_wo.AssignedTo ?? "Unassigned")</div>
-                </div>
-                <div class="ml-detail-item">
-                    <div class="ml-detail-key">Created</div>
-                    <div class="ml-detail-val ml-mono" style="font-size:12px">@_wo.CreatedAt.ToString("MM/dd/yyyy HH:mm")</div>
-                </div>
-                @if (_wo.DueDate.HasValue)
-                {
-                    <div class="ml-detail-item">
-                        <div class="ml-detail-key">Due Date</div>
-                        <div class="ml-detail-val ml-mono @(_wo.DueDate < DateTime.UtcNow && _wo.Status != WorkOrderStatus.Completed ? "ml-text-red" : "")" style="font-size:12px">
-                            @_wo.DueDate.Value.ToString("MM/dd/yyyy")
+                    <div>
+                        <div class="ml-detail-key">Status</div>
+                        <div class="ml-detail-val">@StatusBadge(_wo.Status)</div>
+                    </div>
+                    <div>
+                        <div class="ml-detail-key">System</div>
+                        <div class="ml-detail-val">@_wo.System</div>
+                    </div>
+                    <div>
+                        <div class="ml-detail-key">Priority</div>
+                        <div class="ml-detail-val">
+                            <span class="ml-priority-@_wo.Priority.ToString().ToLower()">
+                                @PriorityIcon(_wo.Priority) @_wo.Priority
+                            </span>
                         </div>
                     </div>
-                }
-                @if (_wo.CompletedAt.HasValue)
-                {
-                    <div class="ml-detail-item">
-                        <div class="ml-detail-key">Completed</div>
-                        <div class="ml-detail-val ml-text-green ml-mono" style="font-size:12px">
-                            @_wo.CompletedAt.Value.ToString("MM/dd/yyyy HH:mm")
+                    <div>
+                        <div class="ml-detail-key">Created By</div>
+                        <div class="ml-detail-val">@_wo.CreatedBy</div>
+                    </div>
+                    <div>
+                        <div class="ml-detail-key">Assigned To</div>
+                        <div class="ml-detail-val @(_wo.AssignedTo == null ? "ml-text-muted" : "")">
+                            @(_wo.AssignedTo ?? "Unassigned")
                         </div>
                     </div>
-                }
+                    <hr class="ml-divider" style="margin:4px 0" />
+                    <div>
+                        <div class="ml-detail-key">Created</div>
+                        <div class="ml-detail-val ml-mono" style="font-size:12px">
+                            @_wo.CreatedAt.ToString("MM/dd/yyyy HH:mm")
+                        </div>
+                    </div>
+                    @if (_wo.DueDate.HasValue)
+                    {
+                        var overdue = _wo.DueDate < DateTime.UtcNow && _wo.Status != WorkOrderStatus.Completed;
+                        <div>
+                            <div class="ml-detail-key">Due Date</div>
+                            <div class="ml-detail-val ml-mono @(overdue ? "ml-text-red" : "")" style="font-size:12px">
+                                @_wo.DueDate.Value.ToString("MM/dd/yyyy")
+                                @if (overdue) { <span style="font-size:10px"> ⚠ OVERDUE</span> }
+                            </div>
+                        </div>
+                    }
+                    @if (_wo.CompletedAt.HasValue)
+                    {
+                        <div>
+                            <div class="ml-detail-key">Completed</div>
+                            <div class="ml-detail-val ml-mono ml-text-green" style="font-size:12px">
+                                @_wo.CompletedAt.Value.ToString("MM/dd/yyyy HH:mm")
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Quick actions card -->
+            <div class="ml-card">
+                <div class="ml-card-title" style="margin-bottom:12px">QUICK ACTIONS</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <button class="ml-btn ml-btn-ghost ml-btn-sm" style="justify-content:flex-start"
+                            @onclick='() => Nav.NavigateTo("/workorders")'>
+                        ← Back to List
+                    </button>
+                    <button class="ml-btn ml-btn-ghost ml-btn-sm" style="justify-content:flex-start"
+                            @onclick="Refresh">
+                        ↺ Refresh
+                    </button>
+                    <button class="ml-btn ml-btn-ghost ml-btn-sm" style="justify-content:flex-start"
+                            @onclick='() => Nav.NavigateTo("/activity")'>
+                        ⚡ Live Activity Feed
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 }
 
-<!-- Approval Modal -->
+<!-- Approval / Rejection Modal -->
 @if (_showModal)
 {
     <div class="ml-modal-backdrop" @onclick="CloseModal">
         <div class="ml-modal" @onclick:stopPropagation="true">
             <div class="ml-modal-header">
-                <div class="ml-modal-title">@(_approving ? "✓ Approve Work Order" : "✕ Reject Work Order")</div>
+                <div class="ml-modal-title">
+                    @(_approving ? "✓ Approve Work Order" : "✕ Reject Work Order")
+                </div>
                 <button class="ml-modal-close" @onclick="CloseModal">×</button>
             </div>
             <div class="ml-modal-body">
+                <div style="font-family:var(--ml-mono);font-size:11px;color:var(--ml-text-muted);margin-bottom:16px">
+                    WO-@(Id.ToString("D4")) — @_wo?.Title
+                </div>
                 <div class="ml-form-group">
-                    <label class="ml-label">Notes @(_approving ? "(optional)" : "(required)")</label>
-                    <textarea class="ml-textarea" @bind="_approvalNotes"
-                              placeholder="@(_approving ? "Add approval notes..." : "State reason for rejection...")"
-                              style="min-height:80px"></textarea>
+                    <label class="ml-label">
+                        Notes @(_approving ? "(optional)" : "(required — state reason for rejection)")
+                    </label>
+                    <textarea class="ml-textarea"
+                              @bind="_approvalNotes"
+                              placeholder="@(_approving ? "Add any approval notes or conditions..." : "Explain why this work order is being rejected...")"
+                              style="min-height:90px"></textarea>
                 </div>
             </div>
             <div class="ml-modal-footer">
@@ -196,7 +260,9 @@ else
                 }
                 else
                 {
-                    <button class="ml-btn ml-btn-danger" @onclick="ConfirmReject" disabled="@(_acting || string.IsNullOrWhiteSpace(_approvalNotes))">
+                    <button class="ml-btn ml-btn-danger"
+                            @onclick="ConfirmReject"
+                            disabled="@(_acting || string.IsNullOrWhiteSpace(_approvalNotes))">
                         ✕ CONFIRM REJECTION
                     </button>
                 }
@@ -209,7 +275,6 @@ else
     [Parameter] public int Id { get; set; }
 
     WorkOrderDto? _wo;
-    List<(string Action, string? Notes, DateTime ActionDate)> _history = new();
     bool _loading = true, _acting, _showModal, _approving, _isError;
     string _msg = "", _approvalNotes = "";
 
@@ -218,61 +283,107 @@ else
     async Task Load()
     {
         _loading = true;
-        try
-        {
-            _wo = await Api.GetWorkOrderAsync(Id);
-            // In real impl, full action history comes from WorkOrderDto extensions
-            // For now we simulate from approval actions
-            _history.Clear();
-            if (_wo != null && _wo.Status != WorkOrderStatus.Draft)
-                _history.Add(("Submitted", null, _wo.CreatedAt.AddMinutes(1)));
-        }
-        catch { }
+        try { _wo = await Api.GetWorkOrderAsync(Id); }
+        catch { _msg = "Failed to load work order."; _isError = true; }
         finally { _loading = false; }
     }
 
-    void ShowApprovalModal(bool approving) { _approving = approving; _approvalNotes = ""; _showModal = true; }
-    void CloseModal() { _showModal = false; }
+    async Task Refresh()
+    {
+        _msg = "";
+        await Load();
+    }
 
-    async Task DoSubmit() => await Act(() => Api.SubmitAsync(Id));
-    async Task DoStart()  => await Act(() => Api.SubmitAsync(Id)); // placeholder until start endpoint added to ApiService
-    async Task DoComplete() => await Act(() => Api.SubmitAsync(Id)); // placeholder
+    void ShowApprovalModal(bool approving)
+    {
+        _approving     = approving;
+        _approvalNotes = "";
+        _showModal     = true;
+    }
+
+    void CloseModal() => _showModal = false;
+
+    async Task DoSubmit()   => await Act(() => Api.SubmitAsync(Id),   "Work order submitted for review.");
+    async Task DoStart()    => await Act(() => Api.StartAsync(Id),    "Work order started — in progress.");
+    async Task DoComplete() => await Act(() => Api.CompleteAsync(Id), "Work order marked complete. ✓");
 
     async Task ConfirmApprove()
     {
         _showModal = false;
-        await Act(() => Api.ApproveAsync(Id, _approvalNotes));
+        await Act(() => Api.ApproveAsync(Id, _approvalNotes), "Work order approved.");
     }
+
     async Task ConfirmReject()
     {
         _showModal = false;
-        await Act(() => Api.RejectAsync(Id, _approvalNotes));
+        await Act(() => Api.RejectAsync(Id, _approvalNotes), "Work order rejected.");
     }
 
-    async Task Act(Func<Task<WorkOrderDto?>> action)
+    async Task Act(Func<Task<WorkOrderDto?>> action, string successMsg)
     {
         _acting = true; _msg = "";
         try
         {
             var result = await action();
-            if (result != null) { _wo = result; _isError = false; _msg = "Work order updated successfully."; }
+            if (result != null)
+            {
+                _wo      = result;
+                _isError = false;
+                _msg     = successMsg;
+            }
+            else
+            {
+                _isError = true;
+                _msg     = "Action failed — check your permissions and API connection.";
+            }
         }
-        catch { _isError = true; _msg = "Action failed. Check connection."; }
+        catch (Exception ex)
+        {
+            _isError = true;
+            _msg     = $"Error: {ex.Message}";
+        }
         finally { _acting = false; }
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     RenderFragment StatusBadge(WorkOrderStatus s) => s switch
     {
         WorkOrderStatus.Draft       => @<span class="ml-badge ml-badge-draft">Draft</span>,
         WorkOrderStatus.Submitted   => @<span class="ml-badge ml-badge-submitted">Submitted</span>,
-        WorkOrderStatus.UnderReview => @<span class="ml-badge ml-badge-review">Review</span>,
+        WorkOrderStatus.UnderReview => @<span class="ml-badge ml-badge-review">Under Review</span>,
         WorkOrderStatus.Approved    => @<span class="ml-badge ml-badge-approved">Approved</span>,
         WorkOrderStatus.InProgress  => @<span class="ml-badge ml-badge-progress">In Progress</span>,
         WorkOrderStatus.Completed   => @<span class="ml-badge ml-badge-completed">Completed</span>,
         WorkOrderStatus.Rejected    => @<span class="ml-badge ml-badge-rejected">Rejected</span>,
         _ => @<span class="ml-badge ml-badge-draft">@s</span>
     };
-    string PriorityIcon(Priority p) => p switch { Priority.Critical => "🔴", Priority.High => "🟠", Priority.Medium => "🟡", _ => "⚪" };
-    string ActionClass(string a) => a.ToLower() switch { "approved" => "approved", "rejected" => "rejected", "completed" => "completed", "submitted" => "created", _ => "updated" };
-    string ActionIcon(string a) => a.ToLower() switch { "approved" => "✓", "rejected" => "✕", "submitted" => "→", "completed" => "★", _ => "●" };
+
+    string PriorityIcon(Priority p) => p switch
+    {
+        Priority.Critical => "🔴",
+        Priority.High     => "🟠",
+        Priority.Medium   => "🟡",
+        _                 => "⚪"
+    };
+
+    string ActionDotClass(string a) => a.ToLower() switch
+    {
+        "approved"  => "approved",
+        "rejected"  => "rejected",
+        "completed" => "completed",
+        "started"   => "created",
+        "submitted" => "created",
+        _           => "updated"
+    };
+
+    string ActionIcon(string a) => a.ToLower() switch
+    {
+        "approved"  => "✓",
+        "rejected"  => "✕",
+        "submitted" => "→",
+        "started"   => "▶",
+        "completed" => "★",
+        _           => "●"
+    };
 }

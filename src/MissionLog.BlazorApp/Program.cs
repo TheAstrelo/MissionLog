@@ -7,23 +7,15 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// Register AuthStateService as singleton (shared across pages)
+// Singleton auth state — shared across all pages
 builder.Services.AddSingleton<AuthStateService>();
 
-// Register ApiService with HttpClient
-builder.Services.AddScoped(sp =>
+// ApiService — HttpClient base URL + AuthStateService for token attachment
+builder.Services.AddScoped<ApiService>(sp =>
 {
+    var http      = new HttpClient { BaseAddress = new Uri("https://localhost:7100") };
     var authState = sp.GetRequiredService<AuthStateService>();
-    var client = new HttpClient { BaseAddress = new Uri("https://localhost:7100") };
-
-    // Attach token if authenticated
-    if (authState.Token != null)
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", authState.Token);
-
-    return client;
+    return new ApiService(http, authState);
 });
-
-builder.Services.AddScoped<ApiService>();
 
 await builder.Build().RunAsync();
