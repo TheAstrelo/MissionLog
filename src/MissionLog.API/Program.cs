@@ -48,10 +48,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 
+// CORS — dev uses localhost, production reads from config
+var blazorOrigins = builder.Configuration["Cors:AllowedOrigins"]?.Split(',')
+    ?? new[] { "https://localhost:7200", "http://localhost:5200" };
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorPolicy", policy =>
-        policy.WithOrigins("https://localhost:7200", "http://localhost:5200")
+        policy.WithOrigins(blazorOrigins)
               .AllowAnyHeader().AllowAnyMethod().AllowCredentials());
 });
 

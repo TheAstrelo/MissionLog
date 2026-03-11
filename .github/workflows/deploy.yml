@@ -1,0 +1,79 @@
+name: Deploy to Azure
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Install Blazor WASM workload
+      run: dotnet workload install wasm-tools
+
+    - name: Restore
+      run: dotnet restore MissionLog.sln
+
+    # ── API ────────────────────────────────────────────────────────────────────
+
+    - name: Publish API
+      run: dotnet publish src/MissionLog.API/MissionLog.API.csproj \
+        -c Release --no-restore -o ./publish/api
+
+    - name: Deploy API to Azure App Service
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: missionlog-api
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./publish/api
+
+    # ── Blazor ─────────────────────────────────────────────────────────────────
+
+    - name: Inject production API URL into Blazor config
+      run: |
+        sed -i 's|#{API_BASE_URL}#|${{ secrets.API_BASE_URL }}|g' \
+          src/MissionLog.BlazorApp/wwwroot/appsettings.Production.json
+
+    - name: Publish Blazor
+      run: dotnet publish src/MissionLog.BlazorApp/MissionLog.BlazorApp.csproj \
+        -c Release --no-restore -o ./publish/blazor
+
+    - name: Deploy Blazor to Azure Static Web Apps
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        action: upload
+        app_location: ./publish/blazor/wwwroot
+        skip_app_build: true
+        output_location: ""
+
+    # ── Summary ────────────────────────────────────────────────────────────────
+
+    - name: Deployment summary
+      run: |
+        echo "## 🚀 Deployment Complete" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
+        echo "| API | ${{ secrets.API_BASE_URL }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Swagger | ${{ secrets.API_BASE_URL }}/swagger |" >> $GITHUB_STEP_SUMMARY
+        echo "| Blazor App | *(check Azure Static Web Apps portal)* |" >> $GITHUB_STEP_SUMMARY
