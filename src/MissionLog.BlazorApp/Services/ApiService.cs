@@ -76,6 +76,21 @@ public class ApiService
             : null;
     }
 
+    public async Task<WorkOrderDto?> UpdateWorkOrderAsync(int id, UpdateWorkOrderDto dto)
+    {
+        AttachToken();
+        var response = await _http.PutAsJsonAsync($"api/workorders/{id}", dto);
+        return response.IsSuccessStatusCode
+            ? await response.Content.ReadFromJsonAsync<WorkOrderDto>()
+            : null;
+    }
+
+    public async Task<List<UserDto>?> GetUsersAsync()
+    {
+        AttachToken();
+        return await _http.GetFromJsonAsync<List<UserDto>>("api/users");
+    }
+
     // ── Workflow transitions ──────────────────────────────────────────────────
     public async Task<WorkOrderDto?> SubmitAsync(int id)
         => await PostTransition($"api/workorders/{id}/submit");

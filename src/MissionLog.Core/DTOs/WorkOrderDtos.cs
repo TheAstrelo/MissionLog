@@ -56,3 +56,5 @@ public record WorkOrderSummaryDto(
     int Completed,
     int Rejected
 );
+
+public record UserDto(int Id, string Username, string Role);

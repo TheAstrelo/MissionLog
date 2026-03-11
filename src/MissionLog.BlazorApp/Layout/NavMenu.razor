@@ -23,6 +23,9 @@
         <a class="ml-nav-item @IsActive("/workorders/new")" @onclick='() => Go("/workorders/new")'>
             <span class="ml-nav-icon">+</span> New Work Order
         </a>
+        <a class="ml-nav-item @IsActive("/workorders") @IsActive("/edit")" @onclick='() => Go("/workorders")'>
+            <span class="ml-nav-icon">✎</span> My Work Orders
+        </a>
     </div>
 
     <div class="ml-sidebar-footer">

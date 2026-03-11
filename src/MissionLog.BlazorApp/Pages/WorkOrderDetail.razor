@@ -38,6 +38,13 @@ else
 
         <!-- Action buttons — shown based on status + role -->
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+            @if (_wo.CreatedBy == Auth.CurrentUser?.Username || Auth.CurrentUser?.Role is "Supervisor" or "Admin")
+            {
+                <button class="ml-btn ml-btn-ghost ml-btn-sm"
+                        @onclick='() => Nav.NavigateTo($"/workorders/{Id}/edit")'>
+                    ✎ EDIT
+                </button>
+            }
             @if (_wo.Status == WorkOrderStatus.Draft && _wo.CreatedBy == Auth.CurrentUser?.Username)
             {
                 <button class="ml-btn ml-btn-primary ml-btn-sm" @onclick="DoSubmit" disabled="@_acting">
@@ -211,6 +218,13 @@ else
                             @onclick='() => Nav.NavigateTo("/workorders")'>
                         ← Back to List
                     </button>
+                    @if (_wo.CreatedBy == Auth.CurrentUser?.Username || Auth.CurrentUser?.Role is "Supervisor" or "Admin")
+                    {
+                        <button class="ml-btn ml-btn-ghost ml-btn-sm" style="justify-content:flex-start"
+                                @onclick='() => Nav.NavigateTo($"/workorders/{Id}/edit")'>
+                            ✎ Edit Work Order
+                        </button>
+                    }
                     <button class="ml-btn ml-btn-ghost ml-btn-sm" style="justify-content:flex-start"
                             @onclick="Refresh">
                         ↺ Refresh
